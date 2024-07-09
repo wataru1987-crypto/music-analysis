@@ -4,7 +4,22 @@ import './App.css';
 
 const notesSharp = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const notesFlat = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+const frequencies = {
+  'C': 261.63, 'C#': 277.18, 'Db': 277.18, 'D': 293.66, 'D#': 311.13, 'Eb': 311.13,
+  'E': 329.63, 'F': 349.23, 'F#': 369.99, 'Gb': 369.99, 'G': 392.00, 'G#': 415.30, 'Ab': 415.30,
+  'A': 440.00, 'A#': 466.16, 'Bb': 466.16, 'B': 493.88
+};
 const angles = d3.range(0, 2 * Math.PI, 2 * Math.PI / notesSharp.length);
+
+const playNote = (note) => {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const oscillator = audioCtx.createOscillator();
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(frequencies[note], audioCtx.currentTime);
+  oscillator.connect(audioCtx.destination);
+  oscillator.start();
+  oscillator.stop(audioCtx.currentTime + 1);
+};
 
 const CircleOfFifths = ({ melodyNotes, chordNotes, noteNames }) => {
   const ref = useRef();
@@ -33,7 +48,8 @@ const CircleOfFifths = ({ melodyNotes, chordNotes, noteNames }) => {
         .attr('y', y)
         .attr('text-anchor', 'middle')
         .attr('alignment-baseline', 'middle')
-        .text(note);
+        .text(note)
+        .on('click', () => playNote(note));  // クリックで音を再生
     });
 
     // コードノートの対角線を円環の中心まで赤く表示
@@ -49,22 +65,6 @@ const CircleOfFifths = ({ melodyNotes, chordNotes, noteNames }) => {
         .attr('x2', 0)
         .attr('y2', 0)
         .attr('stroke', 'red')
-        .attr('stroke-width', 2);
-    });
-
-    // メロディノートの対角線を円環の中心まで青く表示
-    melodyNotes.forEach((note) => {
-      const i = noteNames.indexOf(note);
-      const angle = angles[i];
-      const x = 150 * Math.cos(angle - Math.PI / 2);
-      const y = 150 * Math.sin(angle - Math.PI / 2);
-
-      g.append('line')
-        .attr('x1', x)
-        .attr('y1', y)
-        .attr('x2', 0)
-        .attr('y2', 0)
-        .attr('stroke', 'blue')
         .attr('stroke-width', 2);
     });
 
@@ -86,7 +86,7 @@ const CircleOfFifths = ({ melodyNotes, chordNotes, noteNames }) => {
         .attr('stroke-dasharray', '2,2');  // 破線にする
     });
 
-    const plotNotes = (noteArray, color, radius, isMelody) => {
+    const plotNotes = (noteArray, color, radius) => {
       noteArray.forEach((note, index) => {
         const angle = angles[noteNames.indexOf(note)];
         const x = radius * Math.cos(angle - Math.PI / 2);
@@ -96,7 +96,8 @@ const CircleOfFifths = ({ melodyNotes, chordNotes, noteNames }) => {
           .attr('cx', x)
           .attr('cy', y)
           .attr('r', 10)
-          .attr('fill', color);
+          .attr('fill', color)
+          .on('click', () => playNote(note));  // クリックで音を再生
 
         // 順番を表示
         g.append('text')
@@ -109,43 +110,41 @@ const CircleOfFifths = ({ melodyNotes, chordNotes, noteNames }) => {
       });
     };
 
-    plotNotes(melodyNotes, 'blue', 170, true);  // メロディ音を外側に表示
-    plotNotes(chordNotes, 'red', 130, false);   // コード音を内側に表示
+    plotNotes(melodyNotes, 'blue', 170);  // メロディ音を外側に表示
+    plotNotes(chordNotes, 'red', 130);   // コード音を内側に表示
   }, [melodyNotes, chordNotes, noteNames]);
 
   return <svg ref={ref} width={400} height={400}></svg>;
 };
 
 const App = () => {
-  const [melodyNotes, setMelodyNotes] = useState([]);
-  const [chordNotes, setChordNotes] = useState([]);
+  const [progressions, setProgressions] = useState([]);
+  const [currentMelodyNotes, setCurrentMelodyNotes] = useState([]);
+  const [currentChordNotes, setCurrentChordNotes] = useState([]);
   const [useSharp, setUseSharp] = useState(true);
   const [selectedMelodyNote, setSelectedMelodyNote] = useState('');
   const [selectedChordNote, setSelectedChordNote] = useState('');
+  const [editingIndex, setEditingIndex] = useState(null);
 
   const noteNames = useSharp ? notesSharp : notesFlat;
 
   useEffect(() => {
-    const savedMelodyNotes = localStorage.getItem('melodyNotes');
-    const savedChordNotes = localStorage.getItem('chordNotes');
-    if (savedMelodyNotes) setMelodyNotes(savedMelodyNotes.split(','));
-    if (savedChordNotes) setChordNotes(savedChordNotes.split(','));
+    const savedProgressions = localStorage.getItem('progressions');
+    if (savedProgressions) setProgressions(JSON.parse(savedProgressions));
   }, []);
 
   const handleAddMelodyNote = () => {
     if (selectedMelodyNote) {
-      const newMelodyNotes = [...melodyNotes, selectedMelodyNote];
-      setMelodyNotes(newMelodyNotes);
-      localStorage.setItem('melodyNotes', newMelodyNotes.join(','));
+      const newMelodyNotes = [...currentMelodyNotes, selectedMelodyNote];
+      setCurrentMelodyNotes(newMelodyNotes);
       setSelectedMelodyNote('');  // ノート追加後に選択をリセット
     }
   };
 
   const handleAddChordNote = () => {
     if (selectedChordNote) {
-      const newChordNotes = [...chordNotes, selectedChordNote];
-      setChordNotes(newChordNotes);
-      localStorage.setItem('chordNotes', newChordNotes.join(','));
+      const newChordNotes = [...currentChordNotes, selectedChordNote];
+      setCurrentChordNotes(newChordNotes);
       setSelectedChordNote('');  // ノート追加後に選択をリセット
     }
   };
@@ -158,11 +157,44 @@ const App = () => {
     setSelectedChordNote(event.target.value);
   };
 
+  const handleAddProgression = () => {
+    if (editingIndex !== null) {
+      const newProgressions = [...progressions];
+      newProgressions[editingIndex] = { melodyNotes: currentMelodyNotes, chordNotes: currentChordNotes };
+      setProgressions(newProgressions);
+      localStorage.setItem('progressions', JSON.stringify(newProgressions));
+      setEditingIndex(null);
+    } else {
+      if (currentMelodyNotes.length > 0 && currentChordNotes.length > 0) {
+        const newProgression = { melodyNotes: currentMelodyNotes, chordNotes: currentChordNotes };
+        const newProgressions = [...progressions, newProgression];
+        setProgressions(newProgressions);
+        localStorage.setItem('progressions', JSON.stringify(newProgressions));
+      }
+    }
+    setCurrentMelodyNotes([]);
+    setCurrentChordNotes([]);
+  };
+
+  const handleEditProgression = (index) => {
+    if (progressions[index]) {
+      setCurrentMelodyNotes(progressions[index].melodyNotes || []);
+      setCurrentChordNotes(progressions[index].chordNotes || []);
+      setEditingIndex(index);
+    }
+  };
+
+  const handleDeleteProgression = (index) => {
+    const newProgressions = progressions.filter((_, i) => i !== index);
+    setProgressions(newProgressions);
+    localStorage.setItem('progressions', JSON.stringify(newProgressions));
+  };
+
   const clearData = () => {
-    localStorage.removeItem('melodyNotes');
-    localStorage.removeItem('chordNotes');
-    setMelodyNotes([]);
-    setChordNotes([]);
+    localStorage.removeItem('progressions');
+    setProgressions([]);
+    setCurrentMelodyNotes([]);
+    setCurrentChordNotes([]);
   };
 
   return (
@@ -179,6 +211,11 @@ const App = () => {
           </select>
           <button onClick={handleAddMelodyNote}>Add</button>
         </label>
+        <div>
+          {currentMelodyNotes.map((note, index) => (
+            <span key={index}>{note} </span>
+          ))}
+        </div>
       </div>
       <div>
         <label>
@@ -191,6 +228,14 @@ const App = () => {
           </select>
           <button onClick={handleAddChordNote}>Add</button>
         </label>
+        <div>
+          {currentChordNotes.map((note, index) => (
+            <span key={index}>{note} </span>
+          ))}
+        </div>
+      </div>
+      <div>
+        <button onClick={handleAddProgression}>{editingIndex !== null ? 'Save Changes' : 'Add Progression'}</button>
       </div>
       <div>
         <label>
@@ -202,7 +247,19 @@ const App = () => {
         </label>
       </div>
       <button onClick={clearData}>Clear Data</button>
-      <CircleOfFifths melodyNotes={melodyNotes} chordNotes={chordNotes} noteNames={noteNames} />
+      <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+        {progressions.filter(p => p).map((progression, index) => (
+          <div key={index} style={{ margin: '20px' }}>
+            <CircleOfFifths
+              melodyNotes={progression.melodyNotes}
+              chordNotes={progression.chordNotes}
+              noteNames={noteNames}
+            />
+            <button onClick={() => handleEditProgression(index)}>Edit</button>
+            <button onClick={() => handleDeleteProgression(index)}>Delete</button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
