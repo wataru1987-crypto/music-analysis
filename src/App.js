@@ -57,7 +57,7 @@ const CircleOfFifths = ({ melodyNotes, chordNotes, noteNames }) => {
       const i = noteNames.indexOf(note);
       const angle = angles[i];
       const x = 150 * Math.cos(angle - Math.PI / 2);
-      const y = 150 * Math.sin(angle - Math.PI / 2);
+      const y = 150 *Math.sin(angle - Math.PI / 2);
 
       g.append('line')
         .attr('x1', x)
